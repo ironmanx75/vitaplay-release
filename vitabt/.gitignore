@@ -1,0 +1,5 @@
+plugin/build/
+plugin/stubs/
+plugin/*.skprx
+iap2c/build/
+._*

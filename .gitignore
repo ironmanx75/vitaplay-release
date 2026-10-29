@@ -1,0 +1,22 @@
+# Build artifacts
+**/build/
+*.o
+*.elf
+*.velf
+# Kernel plugin build outputs (rebuilt from source)
+**/stubs/
+*.skprx
+# The app VPK lives in vitaplay/ only as a build output; the shipped copy is VitaPlay-beta.vpk
+vitaplay/*.vpk
+# Secrets — the MFi identity must NEVER be committed
+**/offline-mfi/
+*.pk8
+*.p7b
+*.pem
+*.key
+identity.txt
+pairings.txt
+# macOS / editor junk
+._*
+.DS_Store
+build.log

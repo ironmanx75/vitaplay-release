@@ -1,0 +1,15 @@
+vitaplaybt:
+  attributes: 0
+  version:
+    major: 1
+    minor: 1
+  main:
+    start: module_start
+    stop: module_stop
+  libraries:
+    VitaPlayBt:
+      syscall: true
+      functions:
+        - vpbt_status
+        - vpbt_read
+        - vpbt_write

@@ -1,0 +1,5 @@
+build/
+*.vpk
+btplugin/build/
+btplugin/stubs/
+btplugin/*.skprx
