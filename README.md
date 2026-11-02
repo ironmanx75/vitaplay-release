@@ -69,6 +69,8 @@ Both the Bluetooth bootstrap and the post-handoff iAP2 control tunnel run entire
 | [`vitabt/`](vitabt/) | Reusable dev/homebrew library: the kernel plugin + the iAP2 byte-pipe API + link layer |
 | [`vitauap/`](vitauap/) | Router-free library (research): drive `SceWlanBt` into Wi-Fi AP (uAP) mode — see §8 |
 | [`FINDINGS.md`](FINDINGS.md) | How the on-device Bluetooth bootstrap (and the router-free uAP work, §8) were reverse-engineered |
+| `VitaPlay-beta.vpk` | Prebuilt app to install with VitaShell (the `vitaplaybt` kernel plugin is bundled inside it) |
+| `vitaplaybt.skprx` | The kernel plugin as a **standalone file** — already inside the VPK; provided separately for convenience |
 | `LICENSE` | GPL-3.0 |
 
 (The iAP2 link layer is vendored inside both `vitaplay/` and `vitabt/`, so each builds on its own.

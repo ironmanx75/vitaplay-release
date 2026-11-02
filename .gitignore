@@ -20,3 +20,6 @@ pairings.txt
 ._*
 .DS_Store
 build.log
+
+# ship the standalone kernel plugin at the repo root (same file that is bundled in the VPK)
+!/vitaplaybt.skprx

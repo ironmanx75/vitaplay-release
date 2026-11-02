@@ -99,24 +99,90 @@ make assets     # regenerate the LiveArea images (needs Java)
 
 ## Install and set up
 
-1. Enable **Unsafe Homebrew** (HENkaku settings) — VitaPlay loads a kernel plugin.
-2. Install `VitaPlay.vpk` with VitaShell on a hacked Vita (HENkaku/Ensō).
-3. **Boot-load the Bluetooth plugin.** The `vitaplaybt` kernel plugin ships inside the VPK and must
-   be resident before VitaPlay starts (a userspace app can't load a kernel module it then calls).
-   Add it to `ux0:tai/config.txt` under `*KERNEL`, then reboot:
+### What you need first
+
+- A **PS Vita or PS TV on firmware 3.65**, jailbroken with **HENkaku + Ensō**. The kernel plugin's
+  reverse-engineered offsets are for 3.65; other firmware needs them re-derived (see FINDINGS.md).
+- **Unsafe Homebrew enabled** — *Settings → HENkaku Settings → Enable unsafe homebrew*. VitaPlay
+  loads a kernel plugin, so it will not run without this.
+- **VitaShell** on the Vita (to install the VPK and edit `config.txt`).
+- A way to copy files to the Vita: USB (VitaShell → `SELECT` for USB), or FTP (VitaShell → `SELECT`,
+  then connect to the shown `ftp://<vita-ip>:1337/`).
+- An **MFi accessory identity** — not shipped; see step 4.
+- An **iPhone** and a **Wi-Fi network both devices join** (this build still needs a shared router;
+  router-free is research-only — see the main README).
+
+### Step 1 — Install the app
+
+Copy **`VitaPlay-beta.vpk`** to the Vita, open **VitaShell**, highlight the `.vpk`, press **✕**, and
+confirm the install. It installs as **VitaPlay** with title ID **`VPLY00001`**, and a VitaPlay bubble
+appears in the LiveArea.
+
+### Step 2 — Boot-load the Bluetooth kernel plugin
+
+The `vitaplaybt` kernel plugin **ships bundled inside the VPK** — installing the app in step 1 already
+placed it on the Vita at:
+
+```
+ux0:app/VPLY00001/vitaplaybt.skprx
+```
+
+(A **standalone copy, `vitaplaybt.skprx`, is also provided in this release** next to the VPK, in case
+you want to inspect it, keep it elsewhere, or load it from a different path. You do **not** need it if
+you installed the VPK — the bundled copy at the path above is the same file.)
+
+The plugin must be resident **before** VitaPlay launches — a userspace app can't load a kernel module
+it then calls, because syscall imports are bound at app-load time — so taiHEN loads it at boot:
+
+1. In VitaShell, open **`ux0:tai/config.txt`** (press **✕** on it, choose *Open decrypted* / edit).
+   If `ux0:tai/` or `config.txt` doesn't exist, create it (most Ensō setups already have one).
+2. Find the **`*KERNEL`** section (plugins listed under it load into the kernel). Add this line in
+   that section — **not** under `*main` (the userspace section):
    ```
    *KERNEL
    ux0:app/VPLY00001/vitaplaybt.skprx
    ```
-4. Copy the accessory identity into `ux0:data/VitaPlay/offline-mfi/`:
-   `identity.pk8` (PKCS#8 P-256 key) and `certificate.p7b`. VitaPlay does not ship these. PlayPort's
-   README describes where the public copies come from (DiPlay's release APK under
-   `assets/offline-mfi/`). Do not redistribute them.
-5. Connect the Vita to the same Wi-Fi network as the iPhone and start VitaPlay. On the home screen,
-   set the Wi-Fi network (**Square**) and password (**Triangle**) — see "Wi-Fi setup" above. The
-   status screen shows the IP, device ID, whether the identity loaded, and the Wi-Fi settings.
-6. On the iPhone, pair the Vita over Bluetooth, then connect. The Vita runs the bootstrap and the
-   phone switches to CarPlay over Wi-Fi.
+   If you prefer the standalone file, copy it somewhere (e.g. `ux0:tai/vitaplaybt.skprx`) and point
+   the line there instead — either path works, same plugin.
+3. **Save and reboot the Vita.** The plugin only takes effect after a full reboot.
+
+To confirm it loaded: launch VitaPlay — its status screen reports when the Bluetooth bootstrap is
+ready, and `ux0:data/VitaPlay/log.txt` logs the plugin pipe coming up. (If you use molecularShell,
+the taiHEN plugin list also shows `vitaplaybt` under the kernel modules.)
+
+### Step 3 — Provide the MFi accessory identity
+
+Copy your accessory identity into **`ux0:data/VitaPlay/offline-mfi/`**:
+
+- `identity.pk8` — the PKCS#8 P-256 private key
+- `certificate.p7b` — the matching certificate
+
+VitaPlay does **not** ship these, and you must not redistribute them. PlayPort's README documents
+where the public copies come from (DiPlay's release APK, under `assets/offline-mfi/`). Without a
+valid identity the MFi authentication step fails and the phone won't hand off to CarPlay.
+
+### Step 4 — Wi-Fi and first run
+
+1. Join the Vita to the **same Wi-Fi network as the iPhone** (Vita *Settings → Network*, or let
+   VitaPlay's on-screen setup below store it).
+2. Launch **VitaPlay**. On the home screen set the Wi-Fi **network name** (press **Square**) and
+   **password** (press **Triangle**) via the on-screen keyboard — no file editing needed. The status
+   panel shows the IP, device ID, whether the identity loaded, and the current Wi-Fi settings.
+3. On the **iPhone**, pair the Vita over **Bluetooth** (Settings → Bluetooth → tap the Vita), then
+   confirm the CarPlay prompt. The Vita runs the bootstrap on-device and the phone switches to
+   CarPlay over Wi-Fi — video appears on the Vita screen.
+
+### Troubleshooting
+
+- **VitaPlay crashes or closes instantly on launch** → Unsafe Homebrew isn't enabled, or the
+  `*KERNEL` line is missing / under the wrong section / points at the wrong path, or you didn't
+  reboot after editing `config.txt`.
+- **Status screen says the identity didn't load** → `identity.pk8` / `certificate.p7b` aren't in
+  `ux0:data/VitaPlay/offline-mfi/` (check exact filenames).
+- **Stuck on "Waiting for Wi-Fi"** → the Vita isn't connected to a network yet (step 4.1).
+- **Phone pairs but never switches to CarPlay** → usually the MFi identity (step 3) or the handoff
+  Wi-Fi settings not matching the network the iPhone is on.
+- **No audio** → known limitation (see "Known limitation" above); everything else should work.
 
 Controls: touch screen → CarPlay touch. Cross/Circle/Triangle → select/back/home. Right stick →
 knob wheel (up/left previous, down/right next; holding repeats), left stick → knob nudges. Square → play/pause, or answer/hang up during a call. D-pad left/right → previous/next
