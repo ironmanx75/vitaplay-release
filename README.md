@@ -14,6 +14,13 @@ do on its own. We got it to do it anyway, from a kernel plugin, with **no bridge
 > the iAP2 control session with live now-playing. **The one piece not working yet is audio output**
 > (the phone won't open the audio stream; see the findings). Everything else works.
 >
+> **Research bonus — router-free (no shared Wi-Fi):** the Vita can also be driven into being its own
+> **Wi-Fi access point** so the iPhone joins it directly, with no router. This is *proven viable* —
+> the AP comes up under the running app, the phone associates, and the Vita's DHCP server hands it an
+> address — but one piece (downlink delivery to the phone) is still unsolved, so it's not a usable
+> mode yet. See [`FINDINGS.md` §8](FINDINGS.md) and [`vitauap/`](vitauap/README.md). The shipping
+> configuration remains a shared Wi-Fi network.
+>
 > Experimental, GPL-3.0, as-is — no warranty or support promise. Not affiliated with or endorsed by
 > Apple or Sony. CarPlay and iAP2 are trademarks/technologies of Apple Inc.
 
@@ -33,6 +40,12 @@ do on its own. We got it to do it anyway, from a kernel plugin, with **no bridge
   reusable, separately-buildable library so other Vita homebrew can make the Vita an RFCOMM client
   to an iPhone's iAP2 service. It gives you a live iAP2 **byte pipe** on-device and a documented
   three-call API; the iAP2 protocol on top is yours to drive (or reuse the included link layer).
+
+- **The router-free library (research)** — [`vitauap/`](vitauap/README.md): a sibling toolkit for the
+  *other* radio — driving the Vita's Wi-Fi into **access-point (uAP) mode** so a phone can join the
+  Vita with no router. Proven to the point where the phone associates and the Vita serves DHCP;
+  downlink to the phone is still unsolved (see [`FINDINGS.md` §8](FINDINGS.md)). Shared as a head
+  start for anyone who wants to finish router-free CarPlay.
 
 The spirit of the release: **here's what we found, and here's a way to use it — it's yours to do
 with what you want.**
@@ -54,7 +67,8 @@ Both the Bluetooth bootstrap and the post-handoff iAP2 control tunnel run entire
 |---|---|
 | [`vitaplay/`](vitaplay/) | The CarPlay receiver app (video/touch/Siri/now-playing + the on-device bootstrap) |
 | [`vitabt/`](vitabt/) | Reusable dev/homebrew library: the kernel plugin + the iAP2 byte-pipe API + link layer |
-| [`FINDINGS.md`](FINDINGS.md) | How the on-device Bluetooth bootstrap was reverse-engineered and works |
+| [`vitauap/`](vitauap/) | Router-free library (research): drive `SceWlanBt` into Wi-Fi AP (uAP) mode — see §8 |
+| [`FINDINGS.md`](FINDINGS.md) | How the on-device Bluetooth bootstrap (and the router-free uAP work, §8) were reverse-engineered |
 | `LICENSE` | GPL-3.0 |
 
 (The iAP2 link layer is vendored inside both `vitaplay/` and `vitabt/`, so each builds on its own.

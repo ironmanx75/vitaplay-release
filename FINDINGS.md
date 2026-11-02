@@ -216,3 +216,79 @@ The protocol stack is ported from **PlayPort**, **DiPlay** and **xcertplay**, wh
 this work is GPL-3.0 too. The MFi accessory identity (`identity.pk8` + `certificate.p7b`) is **not**
 in this repo and must never be committed or shipped — supply your own in
 `ux0:data/VitaPlay/offline-mfi/`.
+
+## 8. Router-free: making the Vita its own Wi-Fi access point (uAP)
+
+Everything above still needs the Vita and the iPhone on the **same Wi-Fi router**. This section is a
+separate investigation into removing the router entirely — the Vita becomes the access point, the
+iPhone joins *it*, and CarPlay runs over that link. The receive half is proven end-to-end; the
+transmit (downlink) half is the one open item. The reusable bring-up lives in
+[`vitauap/`](vitauap/README.md); the research spikes behind it live in the development repo, not this
+curated release.
+
+**The chip can do it.** Wi-Fi is a Marvell Avastar **88W8797** behind the `SceWlanBt` kernel module
+(internal codename "Robin"; the on-chip firmware is `os0:kd/wlanbt_robin_img_ax.skprx`). `SceWlanBt`
+is a **station-only host driver**, but it speaks the standard Marvell / mwifiex host-command protocol
+(16-bit command; response = command | 0x8000), and the AP (uAP) commands are part of that protocol.
+The command path:
+
+```
+sub_02954(adapter, size)             -> cmd node; node[8] = payload ptr (cmdbuf+0xc)
+sub_02db4(adapter, node, opcode, len) -> fills the SDIO/mwifiex header + queues it
+sub_01cd4(adapter, msg, len, ...)     -> response/event handler; type@msg+2, code@msg+4, result@msg+0xa
+```
+
+**The key trick — `bss_type`.** Marvell routes a command to the station or the uAP engine by the
+`bss_type` nibble in the `seq_num` field (`seq_num = seq | bss_num<<8 | bss_type<<12`). The station
+driver's enqueue (`sub_02db4`) force-zeroes that byte (`cmdbuf[9] = 0`), so a uAP command lands on the
+STA engine and the firmware rejects it (`result=1`). Re-stamping `cmdbuf[9] = 0x10`
+(`bss_num=0, bss_type=1=UAP`) right after enqueue, before the send-worker DMAs the buffer, makes the
+firmware's AP engine accept it. With that one byte fixed:
+
+```
+UAP_SYS_CONFIG (0x00b0, SET) + TLVs {SSID, BCAST_SSID, CHANNELBANDLIST, ENCRY_PROTOCOL=open}  -> result=0
+UAP_BSS_START  (0x00b1)                                                                        -> result=0
+```
+
+…and the SSID beacons. An iPhone sees it, **associates, and stays connected** — the firmware handles
+auth/association autonomously and raises the standard Marvell uAP events through `sub_01cd4`
+(`0x002d UAP_STA_ASSOC`, `0x002c/0x0043/0x0044` BSS start/active/idle). Command IDs:
+`UAP_SYS_CONFIG 0x00b0`, `UAP_BSS_START 0x00b1`, `UAP_BSS_STOP 0x00b2`; uAP TLVs (prop. base 0x100):
+SSID `0x0000`, MAC_ADDRESS `0x12b`, CHANNELBANDLIST `0x12a`, BCAST_SSID `0x130`, ENCRY_PROTOCOL
+`0x140`. The authoritative wire reference is mainline Linux `mwifiex` (`uap_cmd.c` / `fw.h`).
+
+**The OS can't launch an app while the AP is up.** Driving the firmware into AP mode behind the OS's
+back is incompatible with the app-launch transition on 3.65 — launching *any* app (VitaShell too)
+while the AP is beaconing **kernel-panics**, with zero plugin hooks active and no client connected, so
+it's the OS, not us. The idle shell tolerates the AP for minutes; only the launch (and exit)
+transition trips it. **The ordering flip solves it:** launch the app *first* (no AP yet → normal
+startup), then raise the AP *underneath* the already-running process. So the real architecture is
+*app runs → app raises AP → app serves the phone*, never *AP up → launch app*.
+
+**The receive half works.** With the AP up under a running app, the app (an **unsafe self**, needed
+to bind privileged ports and import `SceNetPs`) configures the Wi-Fi interface directly, bypassing the
+station connection manager (`sceNetCtlInit`'s connect path, which also panics in AP mode):
+
+```
+sceNetSyscallGetIfList         -> interfaces: lo0, bt0, wlan0, phone0 (entry stride 0x140)
+sceNetSyscallIoctl(wlan0, SIOCSIFADDR  192.168.5.1)   rc=0   (FreeBSD ioctl ABI matches the Vita stack)
+sceNetSyscallIoctl(wlan0, SIOCSIFNETMASK 255.255.255.0) rc=0
+sceNetSyscallIoctl(wlan0, SIOCSIFFLAGS  UP)           rc=0   -> flags 0x8843
+```
+
+(The ioctl socket must come from `sceNetSyscallSocket`, not libc `socket()` — different descriptor
+spaces.) With `wlan0` addressed and up, a plain userland UDP socket bound to `:67` **receives the
+iPhone's DHCP DISCOVER**, and a minimal DHCP server answers with an OFFER/ACK. So uplink
+(phone → Vita) and the whole IP-stack integration are proven.
+
+**The open item — downlink (Vita → phone).** The DHCP OFFER is received, built and `sendto()`-s
+successfully, but the phone never sees it. The strong hypothesis, by direct analogy to the
+command-path `bss_type` fix, is that the host's **data TX** path tags outgoing `wlan0` frames with the
+*station* `bss_type` in the per-packet TxPD, so the firmware won't place them on the uAP BSS. Uplink
+works because the firmware delivers received frames regardless; downlink needs the TxPD `bss_type` set
+to uAP. The next step is to find the per-frame transmit function, read its TxPD, and stamp
+`bss_type=uAP` — the mirror of the `cmdbuf[9]=0x10` command fix.
+
+**Status:** router-free is **proven viable** — AP up under a live app, interface self-configured, phone
+associated, uplink + DHCP working — with **downlink delivery the one unsolved piece.** The
+router-based path in sections 2–6 is the working, shipping configuration.

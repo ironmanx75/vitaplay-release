@@ -12,6 +12,10 @@ it for whatever iAP2 accessory role you like.
 For the full story of how this was reverse-engineered — why it looked impossible and the technique
 that cracked it — read [`../FINDINGS.md`](../FINDINGS.md). This README is the integration guide.
 
+> **Related:** [`../vitauap/`](../vitauap/) is a sibling library for the *other* radio — driving the
+> Vita's **Wi-Fi into access-point (uAP) mode** so a phone can join the Vita with no router. It's the
+> router-free counterpart to this Bluetooth bootstrap (research-stage; see `../FINDINGS.md` §8).
+
 > **Firmware:** the kernel plugin's reverse-engineered offsets are for **firmware 3.65**. On other
 > firmware you must re-derive the handful of `SceBt` functions (see FINDINGS.md §4 and the comments
 > in `plugin/vitaplaybt.c`). Everything above the plugin (the API and `iap2c`) is
